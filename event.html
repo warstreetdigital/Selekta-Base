@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Event Details — Selekta Base</title>
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="app-container">
+      <header class="site-header">
+        <div class="header-inner">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <a href="index.html" class="icon-btn" aria-label="Back to home">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            </a>
+            <span class="brand-title" style="font-size:13px;">Event Overview</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="main-content" style="padding-bottom:120px;">
+        <!-- Hero Media -->
+        <div style="width:100%; border-radius:20px; overflow:hidden; background:#20231F; aspect-ratio:16/9; position:relative;">
+          <img id="evt-detail-hero" src="" alt="" style="width:100%; height:100%; object-fit:cover;" />
+        </div>
+
+        <!-- Title & Meta -->
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <span style="font-size:10px; font-weight:800; color:#128E5B; text-transform:uppercase; letter-spacing:0.05em; background:#E8F9F2; border:1px solid rgba(32,201,130,0.3); padding:2px 8px; border-radius:999px; align-self:flex-start;">
+            Verified Original
+          </span>
+          <h1 id="evt-detail-title" style="font-size:20px; font-weight:900; color:#20231F; line-height:1.2;"></h1>
+          
+          <div style="display:flex; flex-direction:column; gap:4px; margin-top:4px;">
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#128E5B; font-weight:700;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <span id="evt-detail-date"></span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#6F776D;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <span id="evt-detail-venue"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div style="background:#FAF9F5; border:1px solid #E5DFD5; border-radius:18px; padding:16px;">
+          <h3 style="font-size:12px; font-weight:800; text-transform:uppercase; color:#6F776D; letter-spacing:0.05em; margin-bottom:6px;">About Event</h3>
+          <p id="evt-detail-desc" style="font-size:12.5px; color:#20231F; line-height:1.6;"></p>
+        </div>
+
+        <!-- Available Ticket Tiers -->
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <h3 style="font-size:12px; font-weight:800; text-transform:uppercase; color:#6F776D; letter-spacing:0.05em; padding-left:2px;">Ticket Options</h3>
+          <div id="evt-detail-tiers" style="display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+
+        <!-- Policies -->
+        <div style="background:#FAF9F5; border:1px solid #E5DFD5; border-radius:18px; padding:16px; font-size:12px; color:#6F776D; line-height:1.5;">
+          <h3 style="font-size:12px; font-weight:800; text-transform:uppercase; color:#20231F; margin-bottom:6px;">Event Policies</h3>
+          <p>• Strictly NO glass bottles permitted on venue grounds.</p>
+          <p>• Official high-contrast QR pass required at entrance gate.</p>
+          <p>• Mobile ticket passes work 100% offline without cellular data.</p>
+        </div>
+      </main>
+
+      <!-- Sticky Bottom Action Bar -->
+      <div style="position:fixed; bottom:0; left:0; right:0; z-index:40; background:#FAF9F5; border-top:1px solid #E5DFD5; padding:12px 14px; box-shadow:0 -4px 12px rgba(0,0,0,0.05);">
+        <div style="max-width:440px; margin:0 auto; display:flex; gap:10px; align-items:center;">
+          <a href="index.html" class="btn-secondary" style="flex:1;">Home</a>
+          <a id="evt-buy-btn" href="checkout.html" class="btn-primary" style="flex:2; padding:12px;">Get Tickets</a>
+        </div>
+      </div>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

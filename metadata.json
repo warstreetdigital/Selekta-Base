@@ -1,0 +1,6 @@
+{
+  "name": "Selekta Base - Zimbabwe Event Discovery & Ticketing PWA",
+  "description": "Discover upcoming events in Zimbabwe, explore by category and location, select ticket phases, and manage digital QR tickets with mobile-first EcoCash checkout.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

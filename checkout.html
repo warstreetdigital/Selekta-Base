@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Checkout — Selekta Base</title>
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="app-container">
+      <header class="site-header">
+        <div class="header-inner">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <a href="index.html" class="icon-btn" aria-label="Back">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            </a>
+            <span class="brand-title" style="font-size:13px;">Official Checkout</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="main-content" style="padding-bottom:60px;">
+        <!-- Step 1 & 2: Selection & Payment -->
+        <div id="checkout-step-selection" class="checkout-box">
+          <div>
+            <span style="font-size:10px; font-weight:800; color:#128E5B; text-transform:uppercase; letter-spacing:0.05em; display:block;">Selected Event</span>
+            <h2 id="checkout-event-title" style="font-size:16px; font-weight:900; color:#20231F; line-height:1.25; margin-top:2px;"></h2>
+          </div>
+
+          <!-- Tier Steppers -->
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <span style="font-size:10.5px; font-weight:800; text-transform:uppercase; color:#6F776D; letter-spacing:0.04em;">Select Passes</span>
+            <div id="checkout-tiers-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+          </div>
+
+          <!-- Payment Method: Dedicated Branded EcoCash Option Card -->
+          <div style="display:flex; flex-direction:column; gap:8px; margin-top:4px;">
+            <span style="font-size:10.5px; font-weight:800; text-transform:uppercase; color:#6F776D; letter-spacing:0.04em;">Payment Method</span>
+            <div class="ecocash-card">
+              <div class="ecocash-brand-box">
+                <div class="ecocash-logo-mark">
+                  Eco<span>C</span>
+                </div>
+                <div class="ecocash-details">
+                  <h4>
+                    <span>EcoCash</span>
+                    <span class="ecocash-badge-instant">Instant USSD</span>
+                  </h4>
+                  <p>Pay securely via mobile push authorization</p>
+                </div>
+              </div>
+              <div style="width:20px; height:20px; border-radius:50%; background:#20C982; color:#fff; display:flex; align-items:center; justify-content:center;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Attendee Information Form -->
+          <form id="checkout-form" style="display:flex; flex-direction:column; gap:12px; margin-top:4px;">
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <label style="font-size:10.5px; font-weight:800; text-transform:uppercase; color:#20231F;">EcoCash Mobile Number</label>
+              <input type="tel" id="ecocash-phone-input" required class="search-input" style="background:#FFFFFF; font-family:var(--sb-font-mono); font-weight:bold; font-size:13px;" placeholder="+263 77 000 0000" />
+              <span style="font-size:10px; color:#6F776D;">The handset prompt will be sent directly to this number</span>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <label style="font-size:10.5px; font-weight:800; text-transform:uppercase; color:#20231F;">Full Attendee Name</label>
+              <input type="text" id="attendee-name-input" required class="search-input" style="background:#FFFFFF;" placeholder="e.g. Tendai Moyo" />
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <label style="font-size:10.5px; font-weight:800; text-transform:uppercase; color:#20231F;">Email Address (Pass Backup)</label>
+              <input type="email" id="attendee-email-input" required class="search-input" style="background:#FFFFFF;" placeholder="attendee@gmail.com" />
+            </div>
+
+            <!-- PIN Security Notice -->
+            <div class="security-notice-box">
+              <svg style="flex-shrink:0; margin-top:2px;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+              <div>
+                <strong>PIN Security Guarantee:</strong> A USSD merchant prompt will appear on your phone. Authorize directly on your mobile device. Selekta Base will <strong>never</strong> ask for your EcoCash PIN.
+              </div>
+            </div>
+
+            <!-- Math Summary -->
+            <div style="background:#F4F1EA; border:1px solid #E5DFD5; border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:4px; font-size:12px;">
+              <div style="display:flex; justify-content:space-between; color:#6F776D;">
+                <span>Subtotal</span>
+                <span id="checkout-subtotal" style="font-weight:700; color:#20231F;">$0.00</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; color:#6F776D;">
+                <span>SMS Pass Notification Fee</span>
+                <span style="font-weight:700; color:#20231F;">$0.50</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; font-size:15px; font-weight:900; border-top:1px solid #DDD6C8; padding-top:6px; margin-top:4px;">
+                <span>Total Due</span>
+                <span id="checkout-total" style="color:#20C982;">$0.00</span>
+              </div>
+            </div>
+
+            <button type="submit" id="checkout-submit-btn" class="btn-primary" style="padding:14px; font-size:13px; margin-top:4px;">
+              Pay with EcoCash
+            </button>
+          </form>
+        </div>
+
+        <!-- Step 2.5: Simulated Awaiting Handset PIN Approval -->
+        <div id="checkout-step-awaiting" class="checkout-box" style="display:none; text-align:center;">
+          <div style="width:60px; height:60px; border-radius:50%; background:#E8F9F2; color:#004B87; display:flex; align-items:center; justify-content:center; margin:0 auto;">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          </div>
+
+          <div style="margin-top:6px;">
+            <span class="ecocash-badge-instant" style="font-size:10px;">Awaiting Handset Approval</span>
+            <h3 style="font-size:17px; font-weight:900; color:#20231F; margin-top:4px;">Prompt Sent to <span id="awaiting-masked-phone"></span></h3>
+            <p style="font-size:12px; color:#6F776D; margin-top:4px; line-height:1.4;">
+              Please check your phone screen and enter your confidential EcoCash PIN on your device to authorize the transaction.
+            </p>
+          </div>
+
+          <div style="background:#F4F1EA; border:1px solid #E5DFD5; border-radius:14px; padding:14px; text-align:left; font-size:12px; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; gap:8px; align-items:flex-start;">
+              <span style="width:18px; height:18px; border-radius:50%; background:#004B87; color:#fff; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:900; flex-shrink:0;">1</span>
+              <span>Review merchant prompt on mobile screen</span>
+            </div>
+            <div style="display:flex; gap:8px; align-items:flex-start;">
+              <span style="width:18px; height:18px; border-radius:50%; background:#004B87; color:#fff; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:900; flex-shrink:0;">2</span>
+              <span>Confirm amount with your confidential EcoCash PIN</span>
+            </div>
+            <div style="display:flex; gap:8px; align-items:flex-start;">
+              <span style="width:18px; height:18px; border-radius:50%; background:#20C982; color:#fff; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:900; flex-shrink:0;">3</span>
+              <span>Instant encrypted QR pass delivery to your wallet</span>
+            </div>
+          </div>
+
+          <p style="font-size:11px; color:#128E5B; font-weight:700;">
+            ● Connecting to EcoCash Merchant Gateway...
+          </p>
+        </div>
+
+        <!-- Step 3: Confirmed & Issued -->
+        <div id="checkout-step-success" class="checkout-box" style="display:none; text-align:center;">
+          <div style="width:60px; height:60px; border-radius:50%; background:#E8F9F2; color:#20C982; display:flex; align-items:center; justify-content:center; margin:0 auto;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+
+          <div style="margin-top:6px;">
+            <span style="font-size:10px; font-weight:900; text-transform:uppercase; color:#128E5B; background:#E8F9F2; padding:2px 8px; border-radius:999px;">
+              Payment Verified • EcoCash Push
+            </span>
+            <h3 style="font-size:18px; font-weight:900; color:#20231F; margin-top:6px;">Tickets Ready!</h3>
+            <p style="font-size:12px; color:#6F776D; margin-top:2px;">
+              Booking Reference: <strong id="success-order-ref" style="font-family:var(--sb-font-mono); color:#20231F;"></strong>
+            </p>
+          </div>
+
+          <p style="font-size:11.5px; color:#6F776D;">
+            Your offline digital passes have been issued and cryptographically cached on this device.
+          </p>
+
+          <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+            <a href="tickets.html" class="btn-primary" style="padding:14px;">View Passes in My Tickets</a>
+            <a href="index.html" class="btn-secondary">Return Home</a>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
