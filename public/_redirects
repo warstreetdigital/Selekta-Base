@@ -1,0 +1,11 @@
+# Selekta Base — Cloudflare Pages Canonical Routing
+# Cloudflare Pages automatically serves clean URLs (/explore, /tickets, /account, /event, /checkout, etc.)
+# directly from their corresponding static .html files.
+# Never add 200 rewrites from clean URLs to .html files, as Cloudflare Pages' automatic
+# HTML canonicalization redirects .html back to the clean URL, causing an infinite 308 loop.
+
+# Canonical redirects & aliases
+/home         /              301
+/my-tickets   /tickets       301
+/settings     /account       301
+/admin        /organiser     301

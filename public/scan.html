@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Gate Staff Scanner — Selekta Base</title>
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="app-container">
+      <header class="site-header">
+        <div class="header-inner">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <a href="/account" class="icon-btn" aria-label="Back">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            </a>
+            <span class="brand-title" style="font-size:13px;">Gate Marshal Terminal</span>
+          </div>
+          <span style="font-size:10px; font-weight:900; background:#E8F9F2; color:#128E5B; padding:2px 8px; border-radius:999px;">
+            ● Gate 1 Active
+          </span>
+        </div>
+      </header>
+
+      <main class="main-content" style="padding-bottom:40px;">
+        <!-- Camera Viewfinder Simulation -->
+        <div class="scanner-viewport">
+          <div class="scanner-laser"></div>
+          <div style="position:absolute; inset:20%; border:2px dashed rgba(255,255,255,0.4); border-radius:16px; pointer-events:none; display:flex; align-items:center; justify-content:center;">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"><rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13" r="3"/><path d="M5 7l1-2h4l1 2"/></svg>
+          </div>
+          <span style="position:absolute; bottom:12px; font-size:11px; color:rgba(255,255,255,0.7); font-weight:600;">
+            Align QR Pass within Viewfinder
+          </span>
+        </div>
+
+        <!-- Scan Result Banner -->
+        <div id="scan-status-alert" style="display:none; padding:14px; border-radius:14px; border:1px solid; font-size:12.5px; line-height:1.45;"></div>
+
+        <!-- Gate Attendance Summary -->
+        <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:10px;">
+          <div class="stat-card" style="text-align:center;">
+            <span class="stat-label">Remaining Valid</span>
+            <span id="scan-stat-valid" class="stat-value green">0</span>
+          </div>
+          <div class="stat-card" style="text-align:center;">
+            <span class="stat-label">Checked In</span>
+            <span id="scan-stat-checked" class="stat-value">0</span>
+          </div>
+        </div>
+
+        <!-- Manual Lookup Form -->
+        <div class="account-card" style="padding:16px; display:flex; flex-direction:column; gap:10px;">
+          <h3 style="font-size:12px; font-weight:800; text-transform:uppercase; color:#6F776D;">Manual Reference Entry</h3>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="manual-ticket-input" class="search-input" style="background:#FFFFFF; font-family:var(--sb-font-mono); text-transform:uppercase;" placeholder="e.g. TKT-8921-HRE-01" />
+            <button type="button" id="manual-check-btn" class="btn-primary" style="padding:0 16px; flex-shrink:0;">Verify</button>
+          </div>
+          <button type="button" id="simulate-scan-btn" class="btn-secondary" style="width:100%; margin-top:4px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#20C982" stroke-width="2.5"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>
+            <span>Simulate Live QR Scan</span>
+          </button>
+        </div>
+
+        <div style="text-align:center; padding-top:4px;">
+          <a href="account.html" class="btn-secondary" style="display:inline-flex;">Exit Marshal Terminal</a>
+        </div>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
