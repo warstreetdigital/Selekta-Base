@@ -1,14 +1,21 @@
 // Selekta Base PWA Service Worker (Cloudflare Pages Static Edition)
-const CACHE_NAME = 'selektabase-v2-static';
+const CACHE_NAME = 'selektabase-v6-static';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
+  '/explore',
   '/explore.html',
+  '/event',
   '/event.html',
+  '/tickets',
   '/tickets.html',
+  '/checkout',
   '/checkout.html',
+  '/account',
   '/account.html',
+  '/organiser',
   '/organiser.html',
+  '/scan',
   '/scan.html',
   '/style.css',
   '/app.js',
@@ -35,6 +42,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
+            console.log('[Selekta Base SW] Deleting obsolete cache:', key);
             return caches.delete(key);
           }
         })
@@ -49,26 +57,47 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // For HTML navigation requests: Network first, fall back to offline cache
+  // For HTML navigation requests: Network first, fall back to matching cached page or index.html
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => {
-        return caches.match(event.request) || caches.match('/index.html');
+      fetch(event.request).catch(async () => {
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        if (!url.pathname.endsWith('.html')) {
+          const withHtml = await caches.match(url.pathname + '.html');
+          if (withHtml) return withHtml;
+        } else {
+          const withoutHtml = await caches.match(url.pathname.replace(/\.html$/, ''));
+          if (withoutHtml) return withoutHtml;
+        }
+        return caches.match('/index.html') || caches.match('/');
       })
     );
     return;
   }
 
-  // Stale-while-revalidate for local CSS, JS, and Icons
+  // Handle local origin requests
   if (url.origin === self.location.origin) {
+    // Never intercept Vite internal scripts or node_modules
+    if (url.pathname.startsWith('/@') || url.pathname.includes('node_modules')) {
+      return;
+    }
+
     event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
         const fetchPromise = fetch(event.request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
-            const clone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, clone);
-            });
+            const contentType = networkResponse.headers.get('content-type') || '';
+            const isHtml = contentType.includes('text/html');
+            const isScriptOrStyle = url.pathname.endsWith('.js') || url.pathname.endsWith('.css');
+
+            // CRITICAL: Never cache an HTML fallback response for a .js or .css request
+            if (!(isScriptOrStyle && isHtml)) {
+              const clone = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(event.request, clone);
+              });
+            }
           }
           return networkResponse;
         }).catch(() => cachedResponse);

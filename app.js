@@ -461,6 +461,124 @@
     }
   }
 
+  let isNavigating = false;
+
+  async function navigateToPage(targetUrl, targetPage, pushHistory = true) {
+    if (isNavigating) return;
+
+    // Determine current logical page
+    const currentPath = window.location.pathname.toLowerCase();
+    let currentPage = 'home';
+    if (currentPath.includes('explore')) currentPage = 'explore';
+    else if (currentPath.includes('tickets')) currentPage = 'tickets';
+    else if (currentPath.includes('account')) currentPage = 'account';
+
+    // Canonical clean URL for display & navigation
+    let cleanUrl = targetUrl;
+    if (targetPage === 'home') cleanUrl = '/';
+    else if (!cleanUrl.startsWith('/')) cleanUrl = '/' + cleanUrl.replace(/\.html$/, '');
+
+    // If tapping the already active tab, smoothly scroll to top
+    if (targetPage === currentPage && (!pushHistory || window.location.pathname === cleanUrl)) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    isNavigating = true;
+
+    // Immediately highlight the selected tab in bottom nav for 0ms latency response
+    const nav = document.querySelector('.bottom-nav');
+    if (nav) {
+      nav.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.toggle('active', item.getAttribute('data-page') === targetPage);
+      });
+    }
+
+    try {
+      // Determine fetch path
+      const fetchPath = cleanUrl === '/' ? '/index.html' : cleanUrl;
+      const response = await fetch(fetchPath, {
+        headers: { 'Accept': 'text/html' }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const htmlText = await response.text();
+      const parser = new DOMParser();
+      const newDoc = parser.parseFromString(htmlText, 'text/html');
+
+      // 1. Update document title
+      if (newDoc.title) {
+        document.title = newDoc.title;
+      }
+
+      // 2. Replace main content
+      const newMain = newDoc.querySelector('.main-content');
+      const currentMain = document.querySelector('.main-content');
+      if (newMain && currentMain) {
+        currentMain.innerHTML = newMain.innerHTML;
+        const newStyle = newMain.getAttribute('style');
+        if (newStyle) currentMain.setAttribute('style', newStyle);
+        else currentMain.removeAttribute('style');
+      }
+
+      // 3. Update header inner
+      const newHeaderInner = newDoc.querySelector('.header-inner');
+      const currentHeaderInner = document.querySelector('.header-inner');
+      if (newHeaderInner && currentHeaderInner) {
+        currentHeaderInner.innerHTML = newHeaderInner.innerHTML;
+      }
+
+      // 4. Transfer any page-specific modals (QR pass, staff PIN auth, reset confirm, story viewer)
+      const modalIds = [
+        'qr-pass-modal',
+        'staff-auth-modal',
+        'reset-confirm-modal',
+        'story-viewer-modal',
+        'guest-recovery-modal'
+      ];
+      modalIds.forEach(id => {
+        const newModal = newDoc.getElementById(id);
+        const curModal = document.getElementById(id);
+        if (newModal) {
+          if (curModal) curModal.replaceWith(newModal);
+          else document.querySelector('.app-container')?.appendChild(newModal);
+        }
+      });
+
+      // 5. Update browser history with canonical clean URL
+      if (pushHistory) {
+        history.pushState({ page: targetPage, url: cleanUrl }, '', cleanUrl);
+      }
+
+      // 6. Initialize header & bottom nav state
+      initHeader();
+      initBottomNav(targetPage);
+
+      // 7. Dispatch target page initializer
+      if (targetPage === 'home') {
+        initIndexPage();
+      } else if (targetPage === 'explore') {
+        initExplorePage();
+      } else if (targetPage === 'tickets') {
+        initTicketsPage();
+      } else if (targetPage === 'account') {
+        initAccountPage();
+      }
+
+      // 8. Scroll to top
+      window.scrollTo(0, 0);
+    } catch (err) {
+      console.warn('[Selekta Base Navigation] Seamless swap fallback to direct navigation:', err);
+      // Hard fallback: direct browser navigation
+      window.location.href = cleanUrl;
+    } finally {
+      isNavigating = false;
+    }
+  }
+
   function initBottomNav(activePage) {
     const nav = document.querySelector('.bottom-nav');
     if (!nav) return;
@@ -486,12 +604,47 @@
         item.classList.remove('active');
       }
     });
+
+    // Attach click handler once for seamless, loop-free internal navigation
+    if (!nav.dataset.navBound) {
+      nav.dataset.navBound = 'true';
+      nav.addEventListener('click', (e) => {
+        const item = e.target.closest('.nav-item');
+        if (!item) return;
+
+        const targetPage = item.getAttribute('data-page');
+        const targetHref = item.getAttribute('href') || '/';
+
+        e.preventDefault();
+        navigateToPage(targetHref, targetPage, true);
+      });
+    }
   }
 
   // --- Full-Screen Pure Social Media Story Viewer ---
   function initStoriesViewer() {
     const modal = document.getElementById('story-viewer-modal');
     if (!modal) return;
+
+    function bindStoryThumbnails(openStoryFn) {
+      document.querySelectorAll('.story-thumb-btn').forEach(btn => {
+        if (!btn.dataset.bound) {
+          btn.dataset.bound = 'true';
+          btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-story-id');
+            if (id && openStoryFn) openStoryFn(id);
+          });
+        }
+      });
+    }
+
+    if (modal.dataset.bound === 'true') {
+      if (typeof window._selektaOpenStory === 'function') {
+        bindStoryThumbnails(window._selektaOpenStory);
+      }
+      return;
+    }
+    modal.dataset.bound = 'true';
 
     let currentStory = null;
     let currentSlideIdx = 0;
@@ -751,13 +904,8 @@
       });
     }
 
-    // Attach click listener to Story thumbnail buttons
-    document.querySelectorAll('.story-thumb-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-story-id');
-        if (id) openStory(id);
-      });
-    });
+    window._selektaOpenStory = openStory;
+    bindStoryThumbnails(openStory);
 
     // Keyboard controls
     window.addEventListener('keydown', (e) => {
@@ -766,6 +914,333 @@
       if (e.key === 'ArrowRight') advanceSlide();
       if (e.key === 'ArrowLeft') previousSlide();
     });
+  }
+
+  // --- Social Feed State & Engagement Storage ---
+  const STORAGE_KEY_SAVED_EVENTS = 'sb_saved_events_v1';
+  const BRAND_AVATAR = '/icons/icon-192.png';
+
+  const SEED_LIKES = {
+    'evt-colour-run-2026': 284,
+    'evt-october-blowout-2026': 412,
+    'evt-blowout-fest-2026': 630,
+    'evt-harare-soundclash': 195
+  };
+
+  const SEED_COMMENTS = {
+    'evt-colour-run-2026': [
+      { id: 'c-cr-1', author: 'Farai K.', text: 'Is the coolerbox pass required for soft drinks too, or just alcoholic beverages?', time: '2h ago' },
+      { id: 'c-cr-2', author: 'Selekta Base', isVerified: true, text: 'Coolerbox pass is for any container brought inside. All food & water stalls also active!', time: '1h ago' },
+      { id: 'c-cr-3', author: 'Ruvimbo M.', text: 'Are the color powder zones safe for toddlers and children?', time: '4h ago' },
+      { id: 'c-cr-4', author: 'Tinashe Z.', text: 'Early bird family pack secured! Borrowdale Racecourse is going to be massive 🔥', time: '1d ago' }
+    ],
+    'evt-october-blowout-2026': [
+      { id: 'c-ob-1', author: 'Tafadzwa B.', text: 'What time do the precision tire spinning exhibitions kick off?', time: '1h ago' },
+      { id: 'c-ob-2', author: 'Selekta Base', isVerified: true, text: 'Precision spin sessions start promptly at 1:00 PM. Gate queues open at 11:30 AM.', time: '45m ago' },
+      { id: 'c-ob-3', author: 'Simba C.', text: 'Strictly zero glass containers right? Pit lane passes booked!', time: '3h ago' },
+      { id: 'c-ob-4', author: 'Kuda N.', text: 'Twin sound walls ready! Annual October blowout tradition continues.', time: '5h ago' }
+    ],
+    'evt-blowout-fest-2026': [
+      { id: 'c-bf-1', author: 'Nigel M.', text: 'Celebrating 10 years of Selekta Base! Will there be classic BMW E30 showcases too?', time: '6h ago' },
+      { id: 'c-bf-2', author: 'Blessing T.', text: 'Standard Phase 1 passes secured. Borrowdale Arena energy!', time: '1d ago' }
+    ],
+    'evt-harare-soundclash': [
+      { id: 'c-sc-1', author: 'Sean D.', text: 'Sound systems line up confirmed? Ready for the reggae & amapiano clash.', time: '2d ago' },
+      { id: 'c-sc-2', author: 'Tariro G.', text: 'Longcheng Plaza Arena under the stars let’s go!', time: '3d ago' }
+    ]
+  };
+
+  function getEventLikes(eventId) {
+    try {
+      const stored = localStorage.getItem('sb_likes_' + eventId);
+      if (stored !== null) return parseInt(stored, 10);
+    } catch (e) {}
+    const def = SEED_LIKES[eventId] || 85;
+    try { localStorage.setItem('sb_likes_' + eventId, String(def)); } catch (e) {}
+    return def;
+  }
+
+  function isEventLiked(eventId) {
+    try {
+      return localStorage.getItem('sb_liked_' + eventId) === 'true';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function toggleEventLike(eventId) {
+    const wasLiked = isEventLiked(eventId);
+    let count = getEventLikes(eventId);
+    const nowLiked = !wasLiked;
+    count = nowLiked ? count + 1 : Math.max(0, count - 1);
+    try {
+      localStorage.setItem('sb_liked_' + eventId, String(nowLiked));
+      localStorage.setItem('sb_likes_' + eventId, String(count));
+    } catch (e) {}
+    return { count, isLiked: nowLiked };
+  }
+
+  function getSavedEvents() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SAVED_EVENTS);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [];
+  }
+
+  function isEventSaved(eventId) {
+    return getSavedEvents().includes(eventId);
+  }
+
+  function toggleSaveEvent(eventId) {
+    const list = getSavedEvents();
+    const idx = list.indexOf(eventId);
+    let isSaved = false;
+    if (idx >= 0) {
+      list.splice(idx, 1);
+      isSaved = false;
+    } else {
+      list.push(eventId);
+      isSaved = true;
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY_SAVED_EVENTS, JSON.stringify(list));
+    } catch (e) {}
+    return isSaved;
+  }
+
+  function getEventComments(eventId) {
+    try {
+      const saved = localStorage.getItem('sb_comments_' + eventId);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    const def = SEED_COMMENTS[eventId] || [];
+    try {
+      localStorage.setItem('sb_comments_' + eventId, JSON.stringify(def));
+    } catch (e) {}
+    return def;
+  }
+
+  function addEventComment(eventId, author, text) {
+    const comments = getEventComments(eventId);
+    const newComment = {
+      id: 'c-user-' + Date.now(),
+      author: author || 'Tendai Moyo',
+      text: text.trim(),
+      time: 'Just now'
+    };
+    comments.unshift(newComment);
+    try {
+      localStorage.setItem('sb_comments_' + eventId, JSON.stringify(comments));
+    } catch (e) {}
+    return comments;
+  }
+
+  function showToast(message) {
+    let toast = document.getElementById('sb-toast-banner');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'sb-toast-banner';
+      toast.className = 'sb-toast';
+      document.body.appendChild(toast);
+    }
+    toast.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#20C982" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      <span>${message}</span>
+    `;
+    toast.classList.add('visible');
+    if (window._sbToastTimer) clearTimeout(window._sbToastTimer);
+    window._sbToastTimer = setTimeout(() => {
+      toast.classList.remove('visible');
+    }, 2400);
+  }
+
+  function openPostOptions(eventId) {
+    const evt = OFFICIAL_EVENTS.find(e => e.id === eventId);
+    if (!evt) return;
+
+    let modal = document.getElementById('post-options-sheet');
+    let backdrop = document.getElementById('post-options-backdrop');
+    if (!modal) {
+      backdrop = document.createElement('div');
+      backdrop.id = 'post-options-backdrop';
+      backdrop.className = 'bottom-sheet-backdrop';
+      document.body.appendChild(backdrop);
+
+      modal = document.createElement('div');
+      modal.id = 'post-options-sheet';
+      modal.className = 'bottom-sheet-modal';
+      document.body.appendChild(modal);
+
+      backdrop.addEventListener('click', closePostOptions);
+    }
+
+    const isSaved = isEventSaved(eventId);
+    const fullUrl = window.location.origin + '/event?id=' + encodeURIComponent(evt.id);
+
+    modal.innerHTML = `
+      <div class="sheet-handle-bar"></div>
+      <div class="action-sheet-options">
+        <button type="button" class="action-sheet-item" id="opt-copy-link">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          <span>Copy Event Link</span>
+        </button>
+        <button type="button" class="action-sheet-item" id="opt-share">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <span>Share Post</span>
+        </button>
+        <button type="button" class="action-sheet-item" id="opt-bookmark">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="${isSaved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          <span>${isSaved ? 'Remove from Saved' : 'Save to Bookmarks'}</span>
+        </button>
+        <a href="/event?id=${evt.id}" class="action-sheet-item" id="opt-details">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span>View Event Details</span>
+        </a>
+        <button type="button" class="action-sheet-item cancel" id="opt-cancel">
+          Cancel
+        </button>
+      </div>
+    `;
+
+    backdrop.classList.add('active');
+    modal.classList.add('active');
+
+    document.getElementById('opt-copy-link')?.addEventListener('click', () => {
+      closePostOptions();
+      navigator.clipboard.writeText(fullUrl).then(() => {
+        showToast('Event link copied to clipboard');
+      }).catch(() => {
+        showToast('Link: ' + fullUrl);
+      });
+    });
+
+    document.getElementById('opt-share')?.addEventListener('click', () => {
+      closePostOptions();
+      if (navigator.share) {
+        navigator.share({
+          title: evt.title,
+          text: `${evt.title} — Official Harare event on Selekta Base`,
+          url: fullUrl
+        }).catch(() => {});
+      } else {
+        navigator.clipboard.writeText(fullUrl).then(() => {
+          showToast('Event link copied to clipboard');
+        });
+      }
+    });
+
+    document.getElementById('opt-bookmark')?.addEventListener('click', () => {
+      closePostOptions();
+      const saved = toggleSaveEvent(eventId);
+      const btn = document.querySelector(`.social-btn.bookmark-btn[data-event-id="${eventId}"]`);
+      if (btn) btn.classList.toggle('saved', saved);
+      showToast(saved ? 'Post saved to bookmarks' : 'Removed from bookmarks');
+    });
+
+    document.getElementById('opt-cancel')?.addEventListener('click', closePostOptions);
+  }
+
+  function closePostOptions() {
+    const modal = document.getElementById('post-options-sheet');
+    const backdrop = document.getElementById('post-options-backdrop');
+    if (modal) modal.classList.remove('active');
+    if (backdrop) backdrop.classList.remove('active');
+  }
+
+  function openCommentsSheet(eventId) {
+    const evt = OFFICIAL_EVENTS.find(e => e.id === eventId);
+    if (!evt) return;
+
+    let sheet = document.getElementById('comments-bottom-sheet');
+    let backdrop = document.getElementById('comments-sheet-backdrop');
+    if (!sheet) {
+      backdrop = document.createElement('div');
+      backdrop.id = 'comments-sheet-backdrop';
+      backdrop.className = 'bottom-sheet-backdrop';
+      document.body.appendChild(backdrop);
+
+      sheet = document.createElement('div');
+      sheet.id = 'comments-bottom-sheet';
+      sheet.className = 'bottom-sheet-modal';
+      document.body.appendChild(sheet);
+
+      backdrop.addEventListener('click', closeCommentsSheet);
+    }
+
+    function renderCommentsList() {
+      const comments = getEventComments(eventId);
+      const listEl = sheet.querySelector('.sheet-content-scroll');
+      const titleEl = sheet.querySelector('.sheet-title');
+      if (titleEl) titleEl.textContent = `Comments (${comments.length})`;
+
+      if (listEl) {
+        listEl.innerHTML = comments.map(c => `
+          <div class="comment-row">
+            <div class="comment-avatar">
+              ${c.isVerified ? 'SB' : (c.author ? c.author.charAt(0).toUpperCase() : 'U')}
+            </div>
+            <div class="comment-body">
+              <span class="comment-author">${c.author}</span>
+              ${c.isVerified ? '<span style="color:#20C982; margin-right:4px;">✓</span>' : ''}
+              <span class="comment-text">${c.text}</span>
+              <span class="comment-time">${c.time || 'Recently'}</span>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // Update post comment count button
+      const countBtn = document.querySelector(`.post-view-comments-btn[data-event-id="${eventId}"]`);
+      if (countBtn) {
+        countBtn.textContent = `View all ${comments.length} comments`;
+      }
+    }
+
+    sheet.innerHTML = `
+      <div class="sheet-handle-bar"></div>
+      <div class="sheet-header">
+        <span class="sheet-title">Comments</span>
+        <button type="button" class="sheet-close-btn" id="close-comments-btn" aria-label="Close comments">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="sheet-content-scroll"></div>
+      <form class="sheet-input-bar" id="comment-submit-form">
+        <div class="comment-avatar" style="width:28px; height:28px; font-size:11px;">T</div>
+        <input type="text" class="sheet-input-field" id="new-comment-input" placeholder="Add a comment for Selekta Base..." autocomplete="off" />
+        <button type="submit" class="sheet-post-btn" id="post-comment-btn">Post</button>
+      </form>
+    `;
+
+    backdrop.classList.add('active');
+    sheet.classList.add('active');
+
+    renderCommentsList();
+
+    sheet.querySelector('#close-comments-btn')?.addEventListener('click', closeCommentsSheet);
+
+    const form = sheet.querySelector('#comment-submit-form');
+    const input = sheet.querySelector('#new-comment-input');
+    if (form && input) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+        const profile = getCustomerProfile();
+        addEventComment(eventId, profile.name || 'Tendai Moyo', text);
+        input.value = '';
+        renderCommentsList();
+        showToast('Comment posted');
+      });
+    }
+  }
+
+  function closeCommentsSheet() {
+    const sheet = document.getElementById('comments-bottom-sheet');
+    const backdrop = document.getElementById('comments-sheet-backdrop');
+    if (sheet) sheet.classList.remove('active');
+    if (backdrop) backdrop.classList.remove('active');
   }
 
   // --- Page Initializers ---
@@ -781,43 +1256,243 @@
       if (!feedContainer) return;
       if (list.length === 0) {
         feedContainer.innerHTML = `
-          <div style="background:#EAE5DB; border:1px solid #DCD6CB; border-radius:18px; padding:24px; text-align:center;">
-            <p style="font-size:12px; color:#6F776D;">No official events found matching your search.</p>
+          <div style="background:#FAF8F4; border:1px solid #E5DFD5; border-radius:14px; padding:28px; text-align:center;">
+            <p style="font-size:13px; font-weight:700; color:#20231F;">No official events found matching your search.</p>
+            <p style="font-size:11px; color:#6F776D; margin-top:4px;">Try searching for "Colour Run", "BlowOut", or "Borrowdale".</p>
           </div>`;
         return;
       }
 
-      feedContainer.innerHTML = list.map(evt => `
-        <article class="event-card">
-          <div class="card-poster">
-            <img src="${evt.posterUrl}" alt="${evt.title}" loading="lazy" onerror="this.src='${BRAND_POSTER}'" />
-            <span class="card-status-chip ${evt.status === 'on_sale' ? 'on-sale' : ''}">
-              ${evt.status === 'on_sale' ? 'Official Release' : 'Coming Soon'}
-            </span>
-          </div>
-          <div class="card-body">
-            <div class="card-date-row">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              <span>${new Date(evt.startDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
+      feedContainer.innerHTML = list.map(evt => {
+        const isLiked = isEventLiked(evt.id);
+        const likesCount = getEventLikes(evt.id);
+        const isSaved = isEventSaved(evt.id);
+        const comments = getEventComments(evt.id);
+        const formattedDate = new Date(evt.startDate).toLocaleDateString('en-GB', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric'
+        });
+
+        return `
+          <article class="social-post" data-event-id="${evt.id}">
+            <!-- 1. Publisher Header Row -->
+            <header class="post-publisher-row">
+              <a href="/event?id=${evt.id}" class="publisher-profile">
+                <div class="publisher-avatar-ring">
+                  <div class="publisher-avatar">
+                    <img src="${BRAND_AVATAR}" alt="Selekta Base" onerror="this.src='/icons/icon.svg'" />
+                  </div>
+                </div>
+                <div class="publisher-meta">
+                  <div class="publisher-name-line">
+                    <span class="publisher-name">Selekta Base</span>
+                    <span class="verified-badge" title="Official Verified Organizer">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="#20C982"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                    </span>
+                  </div>
+                  <span class="publisher-location">${evt.venueName}, ${evt.city}</span>
+                </div>
+              </a>
+              <button type="button" class="post-menu-trigger" data-event-id="${evt.id}" aria-label="Post options">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></svg>
+              </button>
+            </header>
+
+            <!-- 2. Full-Width Event Media (Uncovered, pristine poster art) -->
+            <div class="post-media-wrap" data-event-id="${evt.id}">
+              <img src="${evt.posterUrl}" alt="${evt.title}" loading="lazy" onerror="this.src='${BRAND_POSTER}'" />
+              ${evt.hasVideoPreview ? `
+                <div class="post-video-badge">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  <span>Preview</span>
+                </div>
+              ` : ''}
             </div>
-            <h3 class="card-title">${evt.title}</h3>
-            <div class="card-venue-row">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              <span>${evt.venueName}, ${evt.city}</span>
-            </div>
-            <div class="card-footer">
-              <div>
-                <span class="card-price-label">From</span>
-                <span class="card-price-val">${formatPrice(evt.startingPriceUSD)}</span>
+
+            <!-- 3. Social Interaction Bar -->
+            <div class="post-social-bar">
+              <div class="social-action-group">
+                <!-- Like Button -->
+                <button type="button" class="social-btn like-btn ${isLiked ? 'liked' : ''}" data-event-id="${evt.id}" aria-label="Like post">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                </button>
+                <!-- Comment Button -->
+                <button type="button" class="social-btn comment-btn" data-event-id="${evt.id}" aria-label="Open comments">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                </button>
+                <!-- Share Button -->
+                <button type="button" class="social-btn share-btn" data-event-id="${evt.id}" aria-label="Share event">
+                  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
               </div>
-              <div style="display:flex; gap:6px;">
-                <a href="event.html?id=${evt.id}" class="btn-secondary">Details</a>
-                <a href="checkout.html?event=${evt.id}" class="btn-primary">Get Tickets</a>
-              </div>
+
+              <!-- Bookmark / Save Button -->
+              <button type="button" class="social-btn bookmark-btn ${isSaved ? 'saved' : ''}" data-event-id="${evt.id}" aria-label="Save to bookmarks">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+              </button>
             </div>
-          </div>
-        </article>
-      `).join('');
+
+            <!-- 4. Likes & Social Proof -->
+            <div class="post-likes-row" data-event-id="${evt.id}">
+              <span class="likes-count-text"><strong>${likesCount.toLocaleString()}</strong> likes</span>
+            </div>
+
+            <!-- 5. Event Captions & Details -->
+            <div class="post-content-section">
+              <a href="/event?id=${evt.id}" class="post-title-link">
+                <h3 class="post-event-title">${evt.title}</h3>
+              </a>
+              <div class="post-caption-box">
+                <span class="caption-username">Selekta Base</span>
+                <span class="caption-text collapsed">${evt.description}</span>
+                <button type="button" class="caption-more-btn">more</button>
+              </div>
+
+              <!-- Compact Metadata Strip (Clean text, no pill badges) -->
+              <div class="post-meta-strip">
+                <div class="meta-item">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span>${formattedDate}</span>
+                </div>
+                <div class="meta-item venue">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  <span>${evt.venueName}</span>
+                </div>
+                <div class="meta-item status-on-sale">
+                  <span>${evt.status === 'on_sale' ? '● Tickets Active' : '○ Coming Soon'}</span>
+                </div>
+              </div>
+
+              <!-- View Comments Link -->
+              <button type="button" class="post-view-comments-btn" data-event-id="${evt.id}">
+                View all ${comments.length} comments
+              </button>
+            </div>
+
+            <!-- 6. Restrained Ticket Purchase Footer -->
+            <footer class="post-ticket-footer">
+              <div class="post-price-info">
+                <span class="post-price-label">Tickets from</span>
+                <span class="post-price-val">${formatPrice(evt.startingPriceUSD)}</span>
+              </div>
+              <div class="post-actions-group">
+                <a href="/event?id=${evt.id}" class="btn-post-secondary">Details</a>
+                <a href="/checkout?event=${evt.id}" class="btn-post-primary ${evt.status === 'on_sale' ? '' : 'coming-soon'}">
+                  ${evt.status === 'on_sale' ? 'Get Tickets' : 'Coming Soon'}
+                </a>
+              </div>
+            </footer>
+          </article>
+        `;
+      }).join('');
+
+      // Wire Event Handlers on Feed
+      bindFeedInteractions();
+    }
+
+    function bindFeedInteractions() {
+      if (!feedContainer) return;
+
+      // 1. Tapping media navigates to event details
+      feedContainer.querySelectorAll('.post-media-wrap').forEach(el => {
+        el.addEventListener('click', () => {
+          const id = el.getAttribute('data-event-id');
+          if (id) window.location.href = `/event?id=${encodeURIComponent(id)}`;
+        });
+      });
+
+      // 2. Like button toggle
+      feedContainer.querySelectorAll('.social-btn.like-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = btn.getAttribute('data-event-id');
+          if (!id) return;
+          const { count, isLiked } = toggleEventLike(id);
+          btn.classList.toggle('liked', isLiked);
+
+          const likesRow = feedContainer.querySelector(`.post-likes-row[data-event-id="${id}"] .likes-count-text`);
+          if (likesRow) {
+            likesRow.innerHTML = `<strong>${count.toLocaleString()}</strong> likes`;
+          }
+        });
+      });
+
+      // 3. Comment button & "View all X comments"
+      feedContainer.querySelectorAll('.social-btn.comment-btn, .post-view-comments-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = btn.getAttribute('data-event-id');
+          if (id) openCommentsSheet(id);
+        });
+      });
+
+      // 4. Share button
+      feedContainer.querySelectorAll('.social-btn.share-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = btn.getAttribute('data-event-id');
+          const evt = OFFICIAL_EVENTS.find(ev => ev.id === id);
+          if (!evt) return;
+
+          const fullUrl = window.location.origin + '/event?id=' + encodeURIComponent(id);
+          if (navigator.share) {
+            navigator.share({
+              title: evt.title,
+              text: `${evt.title} — Official Harare event on Selekta Base`,
+              url: fullUrl
+            }).catch(() => {});
+          } else {
+            navigator.clipboard.writeText(fullUrl).then(() => {
+              showToast('Event link copied to clipboard');
+            }).catch(() => {
+              showToast('Link: ' + fullUrl);
+            });
+          }
+        });
+      });
+
+      // 5. Bookmark button
+      feedContainer.querySelectorAll('.social-btn.bookmark-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = btn.getAttribute('data-event-id');
+          if (!id) return;
+          const isSaved = toggleSaveEvent(id);
+          btn.classList.toggle('saved', isSaved);
+          showToast(isSaved ? 'Post saved to bookmarks' : 'Removed from bookmarks');
+        });
+      });
+
+      // 6. Three-dot options menu
+      feedContainer.querySelectorAll('.post-menu-trigger').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = btn.getAttribute('data-event-id');
+          if (id) openPostOptions(id);
+        });
+      });
+
+      // 7. Caption Expand / Collapse toggle inline
+      feedContainer.querySelectorAll('.caption-more-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const captionBox = btn.closest('.post-caption-box');
+          if (!captionBox) return;
+          const textEl = captionBox.querySelector('.caption-text');
+          if (!textEl) return;
+
+          const isCollapsed = textEl.classList.contains('collapsed');
+          if (isCollapsed) {
+            textEl.classList.remove('collapsed');
+            btn.textContent = 'less';
+          } else {
+            textEl.classList.add('collapsed');
+            btn.textContent = 'more';
+          }
+        });
+      });
     }
 
     renderEvents(OFFICIAL_EVENTS);
@@ -1455,12 +2130,36 @@
 
   // --- Router & DOM Ready Dispatcher ---
   document.addEventListener('DOMContentLoaded', () => {
-    // Register Service Worker
+    // Register Service Worker and ensure cache freshness
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(err => {
+      navigator.serviceWorker.register('/sw.js').then((registration) => {
+        registration.update();
+      }).catch(err => {
         console.warn('SW registration skipped:', err);
       });
     }
+
+    // Proactively clean legacy caches from earlier versions
+    if (typeof caches !== 'undefined') {
+      caches.keys().then((keys) => {
+        keys.forEach((key) => {
+          if (key !== 'selektabase-v6-static') {
+            caches.delete(key);
+          }
+        });
+      }).catch(() => {});
+    }
+
+    // Handle browser back and forward navigation
+    window.addEventListener('popstate', (e) => {
+      const currentPath = window.location.pathname.toLowerCase();
+      let targetPage = 'home';
+      if (currentPath.includes('explore')) targetPage = 'explore';
+      else if (currentPath.includes('tickets')) targetPage = 'tickets';
+      else if (currentPath.includes('account')) targetPage = 'account';
+
+      navigateToPage(window.location.pathname, targetPage, false);
+    });
 
     const path = window.location.pathname.toLowerCase();
 
