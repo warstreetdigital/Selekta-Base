@@ -1,0 +1,45 @@
+/* Selekta Base Master CSS Variables and Baseline Styles */
+:root {
+  --sb-bg: #F7F5F0;
+  --sb-bg-surface: #FFFFFF;
+  --sb-bg-subtle: #F0EEE8;
+  --sb-border: #EAE9E2;
+  --sb-border-subtle: #F0EFEA;
+  --sb-green: #20C982;
+  --sb-green-dark: #169E65;
+  --sb-green-light: #E8F9F2;
+  --sb-text-primary: #20231F;
+  --sb-text-secondary: #777D75;
+  --sb-text-muted: #9BA199;
+}
+
+body {
+  background-color: var(--sb-bg);
+  color: var(--sb-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  margin: 0;
+  padding: 0;
+}
+
+/* Touch targets and accessibility */
+button, a {
+  touch-action: manipulation;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #F7F5F0;
+}
+::-webkit-scrollbar-thumb {
+  background: #D9D7CE;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #20C982;
+}
