@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="sbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#20C982" />
+      <stop offset="100%" stop-color="#14945E" />
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#181C18" />
+      <stop offset="100%" stop-color="#0E110E" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded squircle with border -->
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#bgGrad)" stroke="#2D352E" stroke-width="12" />
+
+  <!-- Inner ambient glow -->
+  <circle cx="256" cy="240" r="140" fill="#20C982" opacity="0.12" filter="blur(30px)" />
+
+  <!-- Selekta Soundwave & Ticket Emblem -->
+  <!-- Stylized geometric 'S' ticket ribbon -->
+  <g transform="translate(106, 96)">
+    <!-- Ticket notch left & right decorative dots -->
+    <circle cx="150" cy="16" r="8" fill="#748078" opacity="0.6"/>
+    <circle cx="150" cy="304" r="8" fill="#748078" opacity="0.6"/>
+
+    <!-- Dynamic S Ticket Wave -->
+    <path d="M 230 40 
+             C 170 10, 80 20, 60 75
+             C 40 130, 110 150, 175 170
+             C 240 190, 260 230, 240 270
+             C 215 315, 120 320, 60 280" 
+          fill="none" 
+          stroke="url(#sbGrad)" 
+          stroke-width="38" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" />
+
+    <!-- Vinyl / Equalizer Accents -->
+    <rect x="95" y="80" width="16" height="42" rx="8" fill="#20C982" />
+    <rect x="125" y="65" width="16" height="72" rx="8" fill="#F5F7F4" />
+    <rect x="155" y="90" width="16" height="35" rx="8" fill="#20C982" />
+
+    <!-- Secondary equalizer at bottom -->
+    <rect x="125" y="195" width="16" height="50" rx="8" fill="#20C982" />
+    <rect x="155" y="180" width="16" height="80" rx="8" fill="#F5F7F4" />
+    <rect x="185" y="205" width="16" height="40" rx="8" fill="#20C982" />
+
+    <!-- Corner QR Verification Marker -->
+    <rect x="235" y="35" width="28" height="28" rx="6" fill="#20C982" />
+    <rect x="241" y="41" width="16" height="16" rx="2" fill="#101310" />
+    <rect x="245" y="45" width="8" height="8" rx="1" fill="#20C982" />
+  </g>
+</svg>
